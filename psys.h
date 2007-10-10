@@ -1,0 +1,16 @@
+#ifndef particle_sys_h
+#define particle_sys_h
+
+#include <GL/gl.h>
+#include <string.h>
+#include <stdio.h>
+
+#include "grid.h"
+#include "particle.h"
+
+void psys_add(particle *p);
+void psys_calc();
+void psys_init(const int width, const int height, const int size, GLuint texture);
+int *psys_size;
+
+#endif
