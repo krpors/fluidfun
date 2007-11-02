@@ -1,5 +1,6 @@
 #include "gui.h"
 
+/* Initialize GUI's surface */
 void gui_init(gui *ui, graphics *gfx, const int width, const int height)
 {
     ui->gfx = gfx;
@@ -7,6 +8,7 @@ void gui_init(gui *ui, graphics *gfx, const int width, const int height)
     SDL_FillRect(ui->surf, NULL, SDL_MapRGB(gfx->surf->format, 0, 0, 0));
 }
 
+/* Add label to GUI at index y */
 void gui_add_label(gui *ui, const int y, const char *text)
 {
     static SDL_Color fg = {0xff, 0xff, 0xff};
@@ -18,6 +20,7 @@ void gui_add_label(gui *ui, const int y, const char *text)
 
 }
 
+/* Compile GUI into gl texture */
 void gui_build(gui *ui)
 {
     glGenTextures(1, &ui->texture);
@@ -37,6 +40,7 @@ void gui_build(gui *ui)
     gluBuild2DMipmaps(GL_TEXTURE_2D, 3, ui->surf->w, ui->surf->h, GL_RGB, GL_UNSIGNED_BYTE, tex);
 }
 
+/* Render GUI as quad in OpenGL */
 void gui_render(gui *ui)
 {
     glEnable(GL_TEXTURE_2D);

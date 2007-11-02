@@ -85,11 +85,11 @@ void psys_calc()
 
         element_apply(i);
 
-        if(i->energy > 0.85)
+        if(i->energy > 0.8)
         {
             if(et->hot_state > -1) i->next_type = et->hot_state;
         }
-        else if(i->energy < 0.15)
+        else if(i->energy < 0.2)
         {
             if(et->cold_state > -1) i->next_type = et->cold_state;
         }

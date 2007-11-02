@@ -1,6 +1,7 @@
 #include "particle.h"
 #include "element.h"
 
+/* Call when spawning particle */
 void particle_factory(particle *p, const unsigned char type)
 {
     p->type = type;
@@ -11,6 +12,7 @@ void particle_factory(particle *p, const unsigned char type)
     p->birth = -1;
 }
 
+/* Called when two particles MAY collide */
 void particle_react(particle *a, const particle *b)
 {
     float dvec[2] = {a->pos[0] - b->pos[0], a->pos[1] - b->pos[1]};
@@ -52,8 +54,7 @@ void particle_react(particle *a, const particle *b)
                 a->next_type = ae->reaction[b->type];
             }
         }
-
-        if(ae->flags & E_SHARE)
+        else if(ae->flags & E_SHARE)
         {
             if(be->flags & E_EMIT && a->type != b->type) a->energy += be->emit;
             if(be->flags & E_SHARE)

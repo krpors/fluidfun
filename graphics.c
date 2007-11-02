@@ -1,5 +1,6 @@
 #include "graphics.h"
 
+/* Release graphics */
 void graphics_free(graphics *gfx)
 {
     SDL_FreeSurface(gfx->surf);
@@ -7,6 +8,7 @@ void graphics_free(graphics *gfx)
     SDL_Quit();
 }
 
+/* Grab SDL events, update internal representation */
 char graphics_events(graphics *gfx)
 {
     SDL_Event event;
@@ -43,6 +45,7 @@ char graphics_events(graphics *gfx)
     return !gfx->key[SDLK_ESCAPE];
 }
 
+/* Catch key press, then unset it */
 char graphics_onkey(graphics *gfx, const unsigned short code)
 {
     const char c = gfx->key[code];
@@ -50,6 +53,7 @@ char graphics_onkey(graphics *gfx, const unsigned short code)
     return c;
 }
 
+/* Catch button press, then unset it */
 char graphics_onbut(graphics *gfx, const unsigned char code)
 {
     const char c = gfx->but[code];
@@ -57,6 +61,7 @@ char graphics_onbut(graphics *gfx, const unsigned char code)
     return c;
 }
 
+/* Stall when needed (to stablize time) */
 char graphics_sync_time(graphics *gfx, const unsigned int t)
 {
     const unsigned int tickcount = SDL_GetTicks();
@@ -65,6 +70,7 @@ char graphics_sync_time(graphics *gfx, const unsigned int t)
     return 0;
 }
 
+/* Grab a pixel from an SDL_Surface */
 Uint32 pget(SDL_Surface *surface, int x, int y)
 {
     int bpp = surface->format->BytesPerPixel;
@@ -81,6 +87,7 @@ Uint32 pget(SDL_Surface *surface, int x, int y)
     }
 }
 
+/* Initialize keys / SDL / OpenGL / Font */
 void graphics_init(graphics *gfx, const int width, const int height, const char *font)
 {
     gfx->width = width;
