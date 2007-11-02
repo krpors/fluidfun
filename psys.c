@@ -1,15 +1,13 @@
 #include "psys.h"
 #include "element.h"
 
-GLuint psys_texture;
-
 particle *m_p;
 
 int m_active, m_size, m_width, m_height;
 
 void psys_add(particle *p)
 {
-    if(grid_get_type((int)p->pos[0]>>4, (int)p->pos[1]>>4) == G_SOLID) return;
+    if(grid_get_type((int)p->pos[0]>>3, (int)p->pos[1]>>3) == G_SOLID) return;
     if(m_active<m_size)
     {
         memcpy(&m_p[m_active], p, sizeof(particle));
@@ -19,110 +17,141 @@ void psys_add(particle *p)
 
 void psys_calc()
 {
-    register int i;
-    int y, x, c, n;
-    for(i=0; i<m_active; i++)
+    particle *e = m_p + m_active;
+    for(particle *i=m_p; i<e; ++i)
     {
-        const int dx = (int)m_p[i].pos[0] >> 4;
-        const int dy = (int)m_p[i].pos[1] >> 4;
-        for(y=dy-1; y<=dy+1; y++)
+        const float recip = 1.0 / 8;
+        int dx1 = (int)((i->pos[0] - i->size * 2) * recip);
+        int dy1 = (int)((i->pos[1] - i->size * 2) * recip);
+        int dx2 = (int)((i->pos[0] + i->size * 2) * recip);
+        int dy2 = (int)((i->pos[1] + i->size * 2) * recip);
+        if(dx1 < 0) dx1 = 0;
+        else if(dx2 > 63) dx2 = 63;
+        if(dy1 < 0) dy1 = 0;
+        else if(dy2 > 63) dy2 = 63;
+        for(int y=dy1; y<=dy2; ++y)
         {
-            if(y<0 || y>31) continue;
-            for(x=dx-1; x<=dx+1; x++)
+            for(int x=dx1; x<=dx2; ++x)
             {
-                if(x<0 || x>31) continue;
-                if(!(grid_get_type(x, y) == G_SOLID))
+                if(grid_get_type(x, y) != G_SOLID)
                 {
-                    for(c=0; c < grid_get_size(x, y); c++)
+                    const unsigned int size = grid_get_size(x, y);
+                    for(unsigned char c=0; c < size; ++c)
                     {
-                        n = grid_get(x, y, c);
-                        if(n != i) particle_react(&m_p[i], &m_p[n]);
+                        particle *n = grid_get(x, y, c);
+                        if(n != i) particle_react(i, n);
                     }
                 }
             }
         }
     }
-
     grid_clear();
 
     /* Kill bad particles */
-    for(i=0; i<m_active; i++)
+    for(particle *i=m_p; i<m_p+m_active; ++i)
     {
-        const unsigned char gtype = grid_get_type((int)m_p[i].pos[0]>>4, (int)m_p[i].pos[1]>>4);
-        if(gtype == G_SOLID || m_p[i].pos[0]<0 || m_p[i].pos[1]<0 || m_p[i].pos[0]>511 || m_p[i].pos[1]>511)
+        const unsigned char gtype = grid_get_type((int)i->pos[0]>>3, (int)i->pos[1]>>3);
+        if(gtype == G_VOID || gtype == G_SOLID || i->pos[0]<0 || i->pos[1]<0 || i->pos[0]>511 || i->pos[1]>511)
         {
             m_active--;
-            m_p[i] = m_p[m_active];
+            *i = m_p[m_active];
             continue;
+        }
+        if(i->birth > -1 && element_get(i)->flags & E_LIFESPAN)
+        {
+            if(i->birth + element_get(i)->lifespan < SDL_GetTicks())
+            {
+                m_active--;
+                *i = m_p[m_active];
+                continue;
+            }
         }
     }
 
-    glEnable(GL_BLEND);
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, psys_texture);
-    for(i=0; i<m_active; i++)
+    e = m_p + m_active;
+    for(particle *i=m_p; i<e; ++i)
     {
-        particle_update(&m_p[i]);
-
-        const unsigned char gtype = grid_get_type((int)m_p[i].pos[0]>>4, (int)m_p[i].pos[1]>>4);
-        if(gtype == G_UP) m_p[i].vel[1] -= 0.15;
-        else if(gtype == G_DOWN) m_p[i].vel[1] += 0.15;
-        else if(gtype == G_RIGHT) m_p[i].vel[0] += 0.15;
-        else if(gtype == G_LEFT) m_p[i].vel[0] -= 0.15;
-        if(element_get(&m_p[i])->flags & E_SHARE)
+        const element *et = element_get(i);
+        if(i->net_energy_count)
         {
-            if(gtype == G_HOT) m_p[i].energy += 0.15;
-            else if(gtype == G_COLD) m_p[i].energy -= 0.15;
+            i->net_energy /= i->net_energy_count;
+            i->energy = i->energy * 0.8 + i->net_energy * 0.2;
+            i->net_energy = 0.0;
+            i->net_energy_count = 0;
         }
 
-        m_p[i].vel[1] += m_p[i].mass * 0.05;
-        m_p[i].vel[0] *= m_p[i].dampen;
-        m_p[i].vel[1] *= m_p[i].dampen;
+        if(i->energy > 1.0) i->energy = 1.0;
+        else if(i->energy < 0.0) i->energy = 0.0;
+
+        element_apply(i);
+
+        if(i->energy > 0.85)
+        {
+            if(et->hot_state > -1) i->next_type = et->hot_state;
+        }
+        else if(i->energy < 0.15)
+        {
+            if(et->cold_state > -1) i->next_type = et->cold_state;
+        }
+
+        const unsigned char gtype = grid_get_type((int)i->pos[0]>>3, (int)i->pos[1]>>3);
+        if(gtype == G_UP) i->vel[1] -= 0.1;
+        else if(gtype == G_DOWN) i->vel[1] += 0.1;
+        else if(gtype == G_RIGHT) i->vel[0] += 0.1;
+        else if(gtype == G_LEFT) i->vel[0] -= 0.1;
+        if(et->flags & E_SHARE)
+        {
+            if(gtype == G_HOT) i->energy += 0.2;
+            else if(gtype == G_COLD) i->energy -= 0.2;
+        }
+
+        i->vel[1] += i->mass * 0.055;
+        i->vel[0] *= i->dampen;
+        i->vel[1] *= i->dampen;
 
         /* Take note that the condition is on the SQUARED value */
-        float vlen = m_p[i].vel[0]*m_p[i].vel[0] + m_p[i].vel[1]*m_p[i].vel[1];
-        if(vlen > 25.0)
+        float vlen = i->vel[0]*i->vel[0] + i->vel[1]*i->vel[1];
+        if(vlen > 16.0)
         {
-            vlen = (1.0 / sqrtf(vlen)) * 5.0;
-            m_p[i].vel[0] *= vlen;
-            m_p[i].vel[1] *= vlen;
+            vlen = (1.0 / sqrtf(vlen)) * 4.0;
+            i->vel[0] *= vlen;
+            i->vel[1] *= vlen;
         }
 
-        const float test[2] = {m_p[i].pos[0] + m_p[i].vel[0], m_p[i].pos[1] + m_p[i].vel[1]};
-        const int t[2][2] = {{(int)test[0]>>4, (int)test[1]>>4}, {(int)m_p[i].pos[0]>>4, (int)m_p[i].pos[1]>>4}};
+        const float test[2] = {i->pos[0] + i->vel[0], i->pos[1] + i->vel[1]};
+        const int t[2][2] = {{(int)test[0]>>3, (int)test[1]>>3}, {(int)i->pos[0]>>3, (int)i->pos[1]>>3}};
         const char hitx = grid_get_type(t[0][0], t[1][1])==G_SOLID;
         const char hity = grid_get_type(t[1][0], t[0][1])==G_SOLID;
         if(grid_get_type(t[0][0], t[0][1]) != G_SOLID)
         {
-            m_p[i].pos[0] += m_p[i].vel[0];
-            m_p[i].pos[1] += m_p[i].vel[1];
+            i->pos[0] += i->vel[0];
+            i->pos[1] += i->vel[1];
         }
         else if(!hity && hitx)
         {
-            m_p[i].pos[1] += m_p[i].vel[1];
-            m_p[i].vel[0] *= -1.0;
+            i->pos[1] += i->vel[1];
+            i->vel[0] *= -1.0;
         }
         else if(!hitx && hity)
         {
-            m_p[i].pos[0] += m_p[i].vel[0];
-            m_p[i].vel[1] *= -1.0;
+            i->pos[0] += i->vel[0];
+            i->vel[1] *= -1.0;
         }
         else
         {
-            m_p[i].vel[0] *= -1.0;
-            m_p[i].vel[1] *= -1.0;
+            i->vel[0] *= -1.0;
+            i->vel[1] *= -1.0;
         }
 
-        if(!(m_p[i].pos[0]<0 || m_p[i].pos[1]<0 || m_p[i].pos[0]>511 || m_p[i].pos[1]>511))
+        if(!(i->pos[0]<0 || i->pos[1]<0 || i->pos[0]>511 || i->pos[1]>511))
         {
-            grid_add(((int)m_p[i].pos[0])>>4, ((int)m_p[i].pos[1])>>4, i);
+            grid_add(((int)i->pos[0])>>3, ((int)i->pos[1])>>3, i);
         }
     }
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
+    glDrawArrays(GL_POINTS, 0, m_active);
 }
 
-void psys_init(const int width, const int height, const int size, GLuint texture)
+void psys_init(const int width, const int height, const int size)
 {
     m_p = malloc(sizeof(particle) * size);
     m_size = size;
@@ -130,7 +159,10 @@ void psys_init(const int width, const int height, const int size, GLuint texture
     m_height = height;
     m_active = 0;
     psys_size = &m_active;
-    psys_texture = texture;
     grid_init();
+    glEnableClientState(GL_COLOR_ARRAY);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glColorPointer(3, GL_UNSIGNED_BYTE, sizeof(particle), m_p[0].rgb);
+    glVertexPointer(2, GL_FLOAT, sizeof(particle), m_p[0].pos);
 }
 

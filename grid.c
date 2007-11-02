@@ -1,52 +1,63 @@
 #include "grid.h"
 
-unsigned short grid_grid[32][32][64];
-unsigned char grid_size[32][32], grid_flags[32][32];
+void *grid_grid[64][64][32];
+unsigned char grid_size[64][64], grid_flags[64][64][2];
 
-void grid_add(const int x, const int y, const int i)
+void grid_add(const unsigned char x, const unsigned char y, void *i)
 {
-    if(grid_size[y][x]<64)
+    if(grid_size[y][x]<32)
     {
         grid_grid[y][x][grid_size[y][x]] = i;
         grid_size[y][x]++;
     }
 }
 
-unsigned short grid_get(const int x, const int y, const int i)
+void *grid_get(const unsigned char x, const unsigned char y, const unsigned char i)
 {
     return grid_grid[y][x][i];
 }
 
 void grid_clear()
 {
-    memset(grid_size, 0, 32*32);
+    memset(grid_size, 0, 64*64);
 }
 
 void grid_init()
 {
-    memset(grid_flags, 0, 32*32);
+    memset(grid_flags, 0, 64*64);
     grid_clear();
     int x, y;
-    for(x=0; x<32; x++)
+    for(x=0; x<64; ++x)
     {
-        for(y=0; y<32; y++)
+        for(y=0; y<64; ++y)
         {
-            if(!x || !y || x==31 || y==31) grid_flags[y][x] = G_SOLID;
+            if(!x || !y || x==63 || y==63) grid_flags[y][x][0] = G_SOLID;
+            grid_flags[y][x][1] = 0;
         }
     }
 }
 
-void grid_type(const int x, const int y, const unsigned char state)
+void grid_type(const unsigned char x, const unsigned char y, const unsigned char type)
 {
-    grid_flags[y][x] = state;
+    grid_flags[y][x][0] = type;
 }
 
-unsigned char grid_get_type(const int x, const int y)
+void grid_data(const unsigned char x, const unsigned char y, const unsigned char data)
 {
-    return grid_flags[y][x];
+    grid_flags[y][x][1] = data;
 }
 
-unsigned char grid_get_size(const int x, const int y)
+unsigned char grid_get_type(const unsigned char x, const unsigned char y)
+{
+    return grid_flags[y][x][0];
+}
+
+unsigned char grid_get_data(const unsigned char x, const unsigned char y)
+{
+    return grid_flags[y][x][1];
+}
+
+unsigned char grid_get_size(const unsigned char x, const unsigned char y)
 {
     return grid_size[y][x];
 }
