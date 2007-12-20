@@ -19,6 +19,7 @@
 #define G_COLD  (8)
 
 #define G_EMIT  (9)
+
 /*
     The flag grid (for walls)
     The grid grid (stores particles, used to optimize collision)

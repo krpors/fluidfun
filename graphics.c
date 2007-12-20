@@ -111,7 +111,6 @@ void graphics_init(graphics *gfx, const int width, const int height, const char 
     glAlphaFunc(GL_GREATER, 0.2);
     glLineWidth(1);
     glPointSize(5);
-    glEnable(GL_POINT_SMOOTH);
     gfx->font = TTF_OpenFont(font, 16);
 }
 

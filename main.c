@@ -17,12 +17,17 @@
 #define PLINE(x1,y1,x2,y2) {glVertex2i(PCRD((x1),(y1))); glVertex2i(PCRD((x2),(y2)));}
 #define GLINE(x1,y1,x2,y2) {glVertex2i(GCRD((x1),(y1))); glVertex2i(GCRD((x2),(y2)));}
 
+int element_count = 0;
 int element_pointer = 0;
+int xy_pointer[2] = {1, 1};
+int next_key = 0;
 
-void change_selected(int index)
+void change_selected(int delta)
 {
-    element_pointer = index;
-    SDL_WM_SetCaption(element_get_name(index), "Fluid");
+    if(element_pointer + delta > element_count - 1) element_pointer = 0;
+    else if(element_pointer + delta < 0) element_pointer = element_count - 1;
+    else element_pointer += delta;
+    SDL_WM_SetCaption(element_get_name(element_pointer), "Fluid");
 }
 
 inline void render_arrow()
@@ -43,7 +48,7 @@ int main(int argc, char **argv)
     gui_init(&ui, &gfx, 128, 512);
 
     element_init();
-    int element_count = config_parse(&ui, "./data/config.txt");
+    element_count = config_parse(&ui, "./data/config.txt");
 
     gui_build(&ui);
 
@@ -118,6 +123,20 @@ int main(int argc, char **argv)
 
         gui_render(&ui);
 
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glPushMatrix();
+        glScalef(8, 8, 1);
+        glTranslatef(xy_pointer[0], xy_pointer[1], 0.0);
+        glColor3ub(0xff, 0xff, 0xff);
+        glBegin(GL_QUADS);
+        glVertex2f(0.0, 0.0);
+        glVertex2f(1.0, 0.0);
+        glVertex2f(1.0, 1.0);
+        glVertex2f(0.0, 1.0);
+        glEnd();
+        glPopMatrix();
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
         glPushMatrix();
         glScalef(8, 8, 1);
         glTranslatef(64.7, element_pointer*2+1, 0.0);
@@ -128,25 +147,59 @@ int main(int argc, char **argv)
 
         SDL_GL_SwapBuffers();
 
-        // Stall when needed to smooth frames
-        while(graphics_sync_time(&gfx, 6)){}
+        const unsigned int clock = SDL_GetTicks();
 
-        if(gfx.but[SDL_BUTTON_RIGHT] && gfx.mouse_x < 512)
+        // Stall when needed to smooth frames
+        while(graphics_sync_time(&gfx, 4)){}
+
+        void do_key()
         {
-            if(gfx.key[SDLK_LSHIFT] || gfx.key[SDLK_RSHIFT]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), 0);
-            else if(gfx.key[SDLK_h]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_HOT);
-            else if(gfx.key[SDLK_c]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_COLD);
-            else if(gfx.key[SDLK_UP]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_UP);
-            else if(gfx.key[SDLK_DOWN]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_DOWN);
-            else if(gfx.key[SDLK_RIGHT]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_RIGHT);
-            else if(gfx.key[SDLK_LEFT]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_LEFT);
-            else if(gfx.key[SDLK_DELETE]) grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_VOID);
-            else if(gfx.key[SDLK_SPACE])
+            if(gfx.key[SDLK_LSHIFT] || gfx.key[SDLK_RSHIFT])
             {
-                grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_EMIT);
-                grid_data(GCRD(gfx.mouse_x, gfx.mouse_y), element_pointer);
+                next_key = clock + 40;
             }
-            else grid_type(GCRD(gfx.mouse_x, gfx.mouse_y), G_SOLID);
+            else
+            {
+                next_key = clock + 140;
+            }
+        }
+
+        if(next_key < clock)
+        {
+            if(gfx.key[SDLK_UP]) {xy_pointer[1]--; do_key();}
+            else if(gfx.key[SDLK_DOWN]) {xy_pointer[1]++; do_key();}
+            if(gfx.key[SDLK_RIGHT]) {xy_pointer[0]++; do_key();}
+            else if(gfx.key[SDLK_LEFT]) {xy_pointer[0]--; do_key();}
+
+            if(xy_pointer[0] < 0) xy_pointer[0] = 63;
+            else if(xy_pointer[0] > 63) xy_pointer[0] = 0;
+            if(xy_pointer[1] < 0) xy_pointer[1] = 63;
+            else if(xy_pointer[1] > 63) xy_pointer[1] = 0;
+        }
+
+        if(gfx.key[SDLK_x]) grid_type(xy_pointer[0], xy_pointer[1], 0);
+        else if(gfx.key[SDLK_h]) grid_type(xy_pointer[0], xy_pointer[1], G_HOT);
+        else if(gfx.key[SDLK_c]) grid_type(xy_pointer[0], xy_pointer[1], G_COLD);
+        else if(gfx.key[SDLK_v]) grid_type(xy_pointer[0], xy_pointer[1], G_VOID);
+        else if(gfx.key[SDLK_w]) grid_type(xy_pointer[0], xy_pointer[1], G_UP);
+        else if(gfx.key[SDLK_s]) grid_type(xy_pointer[0], xy_pointer[1], G_DOWN);
+        else if(gfx.key[SDLK_a]) grid_type(xy_pointer[0], xy_pointer[1], G_LEFT);
+        else if(gfx.key[SDLK_d]) grid_type(xy_pointer[0], xy_pointer[1], G_RIGHT);
+        else if(gfx.key[SDLK_z])
+        {
+            grid_type(xy_pointer[0], xy_pointer[1], G_EMIT);
+            grid_data(xy_pointer[0], xy_pointer[1], element_pointer);
+        }
+        else if(gfx.key[SDLK_SPACE]) grid_type(xy_pointer[0], xy_pointer[1], G_SOLID);
+        else if(gfx.key[SDLK_RETURN])
+        {
+            particle p;
+            p.vel[0] = 0.0;
+            p.vel[1] = 0.0;
+            p.pos[0] = (xy_pointer[0]<<3) + (rand()%8);
+            p.pos[1] = (xy_pointer[1]<<3) + (rand()%8);
+            particle_factory(&p, element_pointer);
+            psys_add(&p);
         }
 
         if(graphics_onkey(&gfx, SDLK_F1))
@@ -155,20 +208,16 @@ int main(int argc, char **argv)
             gui_build(&ui);
         }
 
-        if(gfx.but[SDL_BUTTON_LEFT])
+
+        if(graphics_onkey(&gfx, SDLK_PAGEDOWN))
         {
-            if(gfx.mouse_x < 512)
-            {
-                particle p;
-                p.vel[0] = 0.0;
-                p.vel[1] = 0.0;
-                p.pos[0] = gfx.mouse_x + (rand()%11) - 5;
-                p.pos[1] = gfx.mouse_y + (rand()%11) - 5;
-                particle_factory(&p, element_pointer);
-                psys_add(&p);
-            }
-            else if(gfx.mouse_y < element_count*16) change_selected((int)((float)(gfx.mouse_y) / 16));
+            change_selected(1);
         }
+        else if(graphics_onkey(&gfx, SDLK_PAGEUP))
+        {
+            change_selected(-1);
+        }
+
     }
     graphics_free(&gfx);
     return 0;

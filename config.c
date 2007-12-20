@@ -41,7 +41,7 @@ void buffer_next(buffer *buf)
 }
 
 /* Get current character */
-char buffer_this(buffer *buf)
+char buffer_at(buffer *buf)
 {
     return buf->data[buf->i];
 }
@@ -49,8 +49,8 @@ char buffer_this(buffer *buf)
 /* Advance past whitespace */
 void buffer_trim(buffer *buf)
 {
-    if(isgraph(buffer_this(buf))) return;
-    while(!isgraph(buffer_this(buf)))
+    if(isgraph(buffer_at(buf))) return;
+    while(!isgraph(buffer_at(buf)))
     {
         buffer_next(buf);
     }
@@ -67,11 +67,11 @@ int buffer_get_command(buffer *buf, char command[32])
 {
     int i = 0;
     buffer_trim(buf);
-    while(!buffer_eof(buf) && buffer_this(buf) != '(' && i < 32)
+    while(!buffer_eof(buf) && buffer_at(buf) != '(' && i < 32)
     {
-        if(isgraph(buffer_this(buf)))
+        if(isgraph(buffer_at(buf)))
         {
-            command[i] = buffer_this(buf);
+            command[i] = buffer_at(buf);
             ++i;
         }
         buffer_next(buf);
@@ -87,16 +87,16 @@ int buffer_get_string(buffer *buf, char str[32])
 {
     int i = 0;
     buffer_trim(buf);
-    if(buffer_this(buf) != '"') return 1;
+    if(buffer_at(buf) != '"') return 1;
     buffer_next(buf);
-    while(!buffer_eof(buf) && buffer_this(buf) != '"' && i < 32)
+    while(!buffer_eof(buf) && buffer_at(buf) != '"' && i < 32)
     {
-        str[i] = buffer_this(buf);
+        str[i] = buffer_at(buf);
         buffer_next(buf);
         ++i;
     }
     buffer_next(buf);
-    if(buffer_this(buf) == ',') buffer_next(buf);
+    if(buffer_at(buf) == ',') buffer_next(buf);
 
     if(i < 32) str[i] = '\0';
     else return 1;
@@ -109,9 +109,10 @@ int buffer_get_int(buffer *buf, int *ret)
     char str[32];
     int i = 0;
     buffer_trim(buf);
-    while(!buffer_eof(buf) && buffer_this(buf) >= '0' && buffer_this(buf) <= '9' && i < 32)
+    while(!buffer_eof(buf) && buffer_at(buf) >= '0'
+        && buffer_at(buf) <= '9' && i < 32)
     {
-        str[i] = buffer_this(buf);
+        str[i] = buffer_at(buf);
         ++i;
         buffer_next(buf);
     }
@@ -119,7 +120,7 @@ int buffer_get_int(buffer *buf, int *ret)
     else return 1;
 
     buffer_next(buf);
-    if(buffer_this(buf) == ',') buffer_next(buf);
+    if(buffer_at(buf) == ',') buffer_next(buf);
 
     *ret = atoi(str);
     return 0;
@@ -131,9 +132,10 @@ int buffer_get_float(buffer *buf, float *ret)
     char str[32];
     int i = 0;
     buffer_trim(buf);
-    while(!buffer_eof(buf) && ((buffer_this(buf) >= '0' && buffer_this(buf) <= '9') || buffer_this(buf) == '.' || buffer_this(buf) == '-')  && i < 32)
+    while(!buffer_eof(buf) && ((buffer_at(buf) >= '0' && buffer_at(buf) <= '9')
+        || buffer_at(buf) == '.' || buffer_at(buf) == '-')  && i < 32)
     {
-        str[i] = buffer_this(buf);
+        str[i] = buffer_at(buf);
         ++i;
         buffer_next(buf);
     }
@@ -141,7 +143,7 @@ int buffer_get_float(buffer *buf, float *ret)
     else return 1;
 
     buffer_next(buf);
-    if(buffer_this(buf) == ',') buffer_next(buf);
+    if(buffer_at(buf) == ',') buffer_next(buf);
 
     *ret = atof(str);
     return 0;
@@ -152,7 +154,7 @@ void parsef(buffer *buf, const char *fmt, ...)
 {
     if(!strlen(fmt))
     {
-        while(buffer_this(buf) != ')') buffer_next(buf);
+        while(buffer_at(buf) != ')') buffer_next(buf);
         buffer_next(buf);
         return;
     }
@@ -178,7 +180,7 @@ void parsef(buffer *buf, const char *fmt, ...)
     va_end(args);
 
     buffer_trim(buf);
-    if(buffer_this(buf) == ')') buffer_next(buf);
+    if(buffer_at(buf) == ')') buffer_next(buf);
 }
 
 int config_parse(gui *ui, const char *config_file)
@@ -295,7 +297,9 @@ int config_parse(gui *ui, const char *config_file)
         else if(!strcmp(command, "addReaction"))
         {
             const int i = element_pointer;
-            parsef(&buf, "ssi", reaction[i][reaction_count[i]][0], reaction[i][reaction_count[i]][1], &reaction_chance[i][reaction_count[i]]);
+            parsef(&buf, "ssi", reaction[i][reaction_count[i]][0],
+                reaction[i][reaction_count[i]][1],
+                &reaction_chance[i][reaction_count[i]]);
             ++reaction_count[i];
         }
         else if(!strcmp(command, "setHotState"))
